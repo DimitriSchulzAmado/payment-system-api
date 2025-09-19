@@ -17,6 +17,6 @@ class Pix:
         img.save(f'static/img/qr_code_payment_{bank_payment_id}.png')
         
         return {
-            "payment_bank_id": bank_payment_id,
+            "bank_payment_id": bank_payment_id,
             "qr_code_path": f'qr_code_payment_{bank_payment_id}'
         }
