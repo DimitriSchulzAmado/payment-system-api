@@ -4,6 +4,7 @@ from db_models.payment import Payment
 from datetime import datetime, timedelta
 from payments.pix import Pix
 from flask_socketio import SocketIO, emit
+from app import handle_connect
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
@@ -45,11 +46,39 @@ def get_image(file_name):
 
 @app.route('/payments/pix/confirmation', methods=['GET'])
 def pix_confirmation():
+    data = request.get_json()
+    
+    # Validations
+    if 'bank_payment_id' not in data and "value" not in data:
+        return jsonify({"error": "Invalid payment data"}), 400
+    
+    payment = Payment.query.filter_by(bank_payment_id=data.get('bank_payment_id')).first()
+    
+    if not payment or payment.paid:
+        return jsonify({"message": "Payment Not Found"}), 404
+        
+    if data.get("value") != payment.value:
+        return jsonify({"error": "Invalid payment data"}), 400
+    
+    payment.paid = True
+    db.session.commit()
+    socketio.emit(f'payment-confirmed-{payment.id}')
+    
     return jsonify({"message": "The payment has been confirmated"}), 200
 
 @app.route('/payments/pix/<int:payment_id>', methods=['GET'])
 def payment_pix_page(payment_id):
     payment = Payment.query.get(payment_id)
+    
+    if not payment:
+        return render_template('404.html')
+    
+    if payment.paid:
+        return render_template(
+            'confirmed_payment.html', 
+            value=payment.value,
+            payment_id=payment.id    
+        )
     return render_template(
         'payment.html', 
         payment_id=payment.id, 
@@ -62,6 +91,10 @@ def payment_pix_page(payment_id):
 @socketio.on('connect')
 def handle_connect():
     print('Client connected to the Server')
+    
+@socketio.on('disconnect')
+def handle_disconnect():
+    print('Client has been disconnected to the server')
 
 if __name__ == "__main__":
     socketio.run(app, debug=True)
