@@ -3,8 +3,7 @@ from repository.database import db
 from db_models.payment import Payment
 from datetime import datetime, timedelta
 from payments.pix import Pix
-from flask_socketio import SocketIO, emit
-from app import handle_connect
+from flask_socketio import SocketIO
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
