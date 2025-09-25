@@ -1,0 +1,282 @@
+openapi: 3.0.3
+info:
+  title: Payment System API
+  description: |
+    Sistema web para criação e processamento de pagamentos PIX com geração de QR Code em tempo real.
+    
+    ## Funcionalidades
+    - Criação de pagamentos PIX via API REST
+    - Geração automática de QR Code para pagamentos
+    - Confirmação de pagamentos em tempo real
+    - Interface web para visualização de pagamentos
+    - WebSocket para notificações em tempo real
+  version: 1.0.0
+  contact:
+    name: Payment System Support
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:5000
+    description: Servidor de desenvolvimento local
+
+tags:
+  - name: PIX Payments
+    description: Operações relacionadas a pagamentos PIX
+  - name: QR Code
+    description: Operações relacionadas a códigos QR
+  - name: Web Pages
+    description: Páginas web da aplicação
+
+paths:
+  /payments/pix:
+    post:
+      tags:
+        - PIX Payments
+      summary: Criar novo pagamento PIX
+      description: |
+        Cria um novo pagamento PIX com valor especificado e prazo de expiração de 30 minutos.
+        Gera automaticamente um QR Code para o pagamento.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - value
+              properties:
+                value:
+                  type: number
+                  format: float
+                  description: Valor do pagamento em reais
+                  example: 100.50
+                  minimum: 0.01
+            examples:
+              pagamento_basico:
+                summary: Pagamento básico
+                value:
+                  value: 100.50
+              pagamento_alto_valor:
+                summary: Pagamento de alto valor
+                value:
+                  value: 1500.00
+      responses:
+        '201':
+          description: Pagamento criado com sucesso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "The payment has been created"
+                  payment:
+                    $ref: '#/components/schemas/Payment'
+        '400':
+          description: Dados inválidos fornecidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                valor_invalido:
+                  summary: Valor inválido
+                  value:
+                    error: "Invalid value"
+
+  /payments/pix/qr_code/{file_name}:
+    get:
+      tags:
+        - QR Code
+      summary: Obter imagem do QR Code
+      description: Retorna a imagem PNG do QR Code gerado para o pagamento
+      parameters:
+        - name: file_name
+          in: path
+          required: true
+          description: Nome do arquivo do QR Code (sem extensão .png)
+          schema:
+            type: string
+            example: "qr_code_payment_1489ede3-3863-4df3-8f8a-f21a215c9d12"
+      responses:
+        '200':
+          description: Imagem do QR Code
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        '404':
+          description: Arquivo não encontrado
+
+  /payments/pix/confirmation:
+    get:
+      tags:
+        - PIX Payments
+      summary: Confirmar pagamento PIX
+      description: |
+        Confirma um pagamento PIX existente. Verifica se o pagamento existe, não foi pago anteriormente
+        e se o valor corresponde. Emite notificação via WebSocket quando confirmado.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - bank_payment_id
+                - value
+              properties:
+                bank_payment_id:
+                  type: string
+                  description: ID único do pagamento gerado pelo banco
+                  example: "1489ede3-3863-4df3-8f8a-f21a215c9d12"
+                value:
+                  type: number
+                  format: float
+                  description: Valor do pagamento para validação
+                  example: 100.50
+            examples:
+              confirmacao_pagamento:
+                summary: Confirmação de pagamento
+                value:
+                  bank_payment_id: "1489ede3-3863-4df3-8f8a-f21a215c9d12"
+                  value: 100.50
+      responses:
+        '200':
+          description: Pagamento confirmado com sucesso
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "The payment has been confirmated"
+        '400':
+          description: Dados de pagamento inválidos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                dados_invalidos:
+                  summary: Dados inválidos
+                  value:
+                    error: "Invalid payment data"
+        '404':
+          description: Pagamento não encontrado ou já foi pago
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Payment Not Found"
+
+  /payments/pix/{payment_id}:
+    get:
+      tags:
+        - Web Pages
+      summary: Visualizar página de pagamento
+      description: |
+        Retorna a página web do pagamento. Se o pagamento foi confirmado, mostra página de confirmação.
+        Se ainda não foi pago, mostra a página com QR Code e informações do pagamento.
+      parameters:
+        - name: payment_id
+          in: path
+          required: true
+          description: ID único do pagamento no sistema
+          schema:
+            type: integer
+            example: 1
+      responses:
+        '200':
+          description: Página HTML do pagamento
+          content:
+            text/html:
+              schema:
+                type: string
+              examples:
+                pagina_pagamento:
+                  summary: Página de pagamento ativo
+                  value: "HTML da página com QR Code e informações do pagamento"
+                pagina_confirmacao:
+                  summary: Página de pagamento confirmado
+                  value: "HTML da página de confirmação do pagamento"
+        '404':
+          description: Pagamento não encontrado
+          content:
+            text/html:
+              schema:
+                type: string
+              examples:
+                pagina_404:
+                  summary: Página de erro 404
+                  value: "HTML da página de erro 404"
+
+components:
+  schemas:
+    Payment:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: ID único do pagamento no sistema
+          example: 1
+        value:
+          type: number
+          format: float
+          description: Valor do pagamento em reais
+          example: 100.50
+        paid:
+          type: boolean
+          description: Status do pagamento (pago ou não)
+          example: false
+        bank_payment_id:
+          type: string
+          description: ID único do pagamento gerado pelo banco
+          example: "1489ede3-3863-4df3-8f8a-f21a215c9d12"
+        qr_code:
+          type: string
+          description: Nome do arquivo do QR Code (sem extensão)
+          example: "qr_code_payment_1489ede3-3863-4df3-8f8a-f21a215c9d12"
+        expiration_date:
+          type: string
+          format: date-time
+          description: Data e hora de expiração do pagamento
+          example: "2025-09-24T15:30:00"
+      required:
+        - id
+        - value
+        - paid
+        - bank_payment_id
+        - qr_code
+        - expiration_date
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Mensagem de erro
+          example: "Invalid value"
+      required:
+        - error
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token JWT para autenticação (se implementado no futuro)
+
+# WebSocket Events (não suportado nativamente pelo OpenAPI)
+# Para documentação dos eventos WebSocket:
+# - connect: Cliente conecta ao servidor
+# - disconnect: Cliente desconecta do servidor  
+# - payment-confirmed-{payment_id}: Evento emitido quando pagamento é confirmado

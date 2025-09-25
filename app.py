@@ -4,6 +4,7 @@ from db_models.payment import Payment
 from datetime import datetime, timedelta
 from payments.pix import Pix
 from flask_socketio import SocketIO
+from docs.api.swagger_helper import add_swagger_routes
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
@@ -11,6 +12,7 @@ app.config['SECRET_KEY'] = 'SECRET_KEY_WEBSOCKET'
 
 db.init_app(app)
 socketio = SocketIO(app)
+add_swagger_routes(app)
 
 @app.route('/payments/pix', methods=['POST'])
 def create_payment_pix():
